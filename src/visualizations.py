@@ -10,16 +10,44 @@ plt.rcParams.update({'font.size': 10, 'axes.labelsize': 11, 'axes.titlesize': 13
 def plot_pipeline_volume_trends(df):
     """
     Generates a time-series plot comparing the active stock layers 
-    (CBP Custody vs HHS Care Over Time).
+    (CBP Custody vs HHS Care Over Time) using dual Y-axes to resolve
+    severe inventory scale mismatches.
     """
-    fig, ax = plt.subplots(figsize=(10, 5))
-    ax.plot(df['date'], df['cbp_stock'], label='Children in CBP Custody', color='#1f77b4', linewidth=2)
-    ax.plot(df['date'], df['hhs_stock'], label='Children in HHS Care', color='#ff7f0e', linewidth=2)
+    fig, ax1 = plt.subplots(figsize=(10, 5))
     
-    ax.set_title('UAC Custody Inventory Trends (CBP vs. HHS)')
-    ax.set_xlabel('Reporting Timeline')
-    ax.set_ylabel('Active Child Count (Logistical Stock)')
-    ax.legend(frameon=True)
+    # 1. Plot CBP Custody Stock on the Primary (Left) Y-Axis
+    line1, = ax1.plot(
+        df['date'], 
+        df['cbp_stock'], 
+        label='Children in CBP Custody', 
+        color='#1f77b4', 
+        linewidth=2
+    )
+    ax1.set_xlabel('Reporting Timeline', fontweight='bold')
+    ax1.set_ylabel('Active CBP Stock (Left Axis)', color='#1f77b4', fontweight='bold')
+    ax1.tick_params(axis='y', labelcolor='#1f77b4')
+    
+    # 2. Create a Secondary Y-Axis sharing the same X-axis for HHS Care Volume
+    ax2 = ax1.twinx()
+    line2, = ax2.plot(
+        df['date'], 
+        df['hhs_stock'], 
+        label='Children in HHS Care', 
+        color='#ff7f0e', 
+        linewidth=2
+    )
+    ax2.set_ylabel('Active HHS Care Stock (Right Axis)', color='#ff7f0e', fontweight='bold')
+    ax2.tick_params(axis='y', labelcolor='#ff7f0e')
+    
+    # Remove the automatic secondary background grid lines to prevent overlapping grid clutter
+    ax2.grid(False)
+    
+    # 3. Combine both lines cleanly into a unified legend box
+    lines = [line1, line2]
+    labels = [l.get_label() for l in lines]
+    ax1.legend(lines, labels, loc='upper right', frameon=True)
+    
+    ax1.set_title('UAC Custody Inventory Trends (CBP vs. HHS)', pad=12)
     plt.tight_layout()
     return fig
 
