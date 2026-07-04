@@ -2,6 +2,7 @@
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
+import numpy as np
 
 # Set clean, professional visual themes for government stakeholders
 sns.set_theme(style="whitegrid")
@@ -10,18 +11,25 @@ plt.rcParams.update({'font.size': 10, 'axes.labelsize': 11, 'axes.titlesize': 13
 def plot_pipeline_volume_trends(df):
     """
     Generates a time-series plot comparing the active stock layers 
-    (CBP Custody vs HHS Care Over Time) using dual Y-axes to resolve
-    severe inventory scale mismatches.
+    (CBP Custody vs HHS Care Over Time). Includes dual-axis rendering and
+    explicit non-null masking to ensure lines connect cleanly across data gaps.
     """
     fig, ax1 = plt.subplots(figsize=(10, 5))
     
+    # --- NON-NULL MASKING PATTERNS TO FORCE CONNECTED LINE PLOTS ---
+    # Filter out records where dates or targets are missing to eliminate rendering voids
+    cbp_clean = df.dropna(subset=['date', 'cbp_stock'])
+    hhs_clean = df.dropna(subset=['date', 'hhs_stock'])
+    
     # 1. Plot CBP Custody Stock on the Primary (Left) Y-Axis
     line1, = ax1.plot(
-        df['date'], 
-        df['cbp_stock'], 
+        cbp_clean['date'], 
+        cbp_clean['cbp_stock'], 
         label='Children in CBP Custody', 
         color='#1f77b4', 
-        linewidth=2
+        linewidth=2,
+        marker='o',          # Adds tiny markers so single isolated data points can be seen
+        markersize=2
     )
     ax1.set_xlabel('Reporting Timeline', fontweight='bold')
     ax1.set_ylabel('Active CBP Stock (Left Axis)', color='#1f77b4', fontweight='bold')
@@ -30,11 +38,13 @@ def plot_pipeline_volume_trends(df):
     # 2. Create a Secondary Y-Axis sharing the same X-axis for HHS Care Volume
     ax2 = ax1.twinx()
     line2, = ax2.plot(
-        df['date'], 
-        df['hhs_stock'], 
+        hhs_clean['date'], 
+        hhs_clean['hhs_stock'], 
         label='Children in HHS Care', 
         color='#ff7f0e', 
-        linewidth=2
+        linewidth=2,
+        marker='o',          # Adds tiny markers so single isolated data points can be seen
+        markersize=2
     )
     ax2.set_ylabel('Active HHS Care Stock (Right Axis)', color='#ff7f0e', fontweight='bold')
     ax2.tick_params(axis='y', labelcolor='#ff7f0e')
@@ -55,14 +65,11 @@ def plot_day_of_week_bottlenecks(df):
     """
     Aggregates efficiency ratios by weekday to highlight processing slowdowns.
     """
-    # Force chronological weekday ordering
     days_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
     
-    # Calculate average efficiency metrics grouped by weekday
     weekday_summary = df.groupby('day_of_week')[['transfer_efficiency_ratio', 'discharge_effectiveness_index']].mean().reindex(days_order)
     weekday_summary = weekday_summary.reset_index()
     
-    # Melt dataframe for structured seaborn plotting
     melted_df = weekday_summary.melt(id_vars='day_of_week', var_name='Metric', value_name='Rate')
     melted_df['Metric'] = melted_df['Metric'].map({
         'transfer_efficiency_ratio': 'CBP → HHS Transfer Speed',
@@ -85,10 +92,8 @@ def plot_backlog_accumulation(df):
     """
     fig, ax = plt.subplots(figsize=(10, 5))
     
-    # Compute 7-day rolling window to smooth out irregular weekend data reporting gaps
     df['rolling_backlog'] = df['net_backlog_change'].rolling(window=7, center=True).mean()
     
-    # Plot positive accumulation as Red (System Overload) and Negative as Green (Clearing Out)
     ax.fill_between(df['date'], df['rolling_backlog'], 0, 
                     where=(df['rolling_backlog'] >= 0), color='#d62728', alpha=0.6, label='Net Backlog Accumulation (Inflow > Discharges)')
     ax.fill_between(df['date'], df['rolling_backlog'], 0, 
