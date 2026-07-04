@@ -42,28 +42,36 @@ def load_clean_uac_data(uploaded_file=None):
             )
 
         print(f"Successfully auto-detected data file at: {filepath}")
-
-        # Load data
         df = pd.read_csv(filepath)
     
-    # --- FIX: Sanitize headers BEFORE renaming to prevent mapping misses on Cloud environments ---
-    df.columns = df.columns.astype(str).str.strip().str.replace(r'\s+', ' ', regex=True)
+    # --- ULTRA-ROBUST CASE-INSENSITIVE KEYWORD COLUMN MATCHING ---
+    new_columns = {}
+    for col in df.columns:
+        col_lower = str(col).lower().strip()
+        
+        if 'date' in col_lower:
+            new_columns[col] = 'date'
+        elif 'apprehended' in col_lower or 'cbp custody*' in col_lower or 'intake' in col_lower:
+            new_columns[col] = 'cbp_intake'
+        elif 'in cbp custody' in col_lower or 'cbp stock' in col_lower:
+            new_columns[col] = 'cbp_stock'
+        elif 'transferred out of cbp' in col_lower or 'cbp_transfer' in col_lower:
+            new_columns[col] = 'cbp_transfer_out'
+        elif 'in hhs care' in col_lower or 'hhs stock' in col_lower:
+            new_columns[col] = 'hhs_stock'
+        elif 'discharged from hhs' in col_lower or 'hhs_discharge' in col_lower:
+            new_columns[col] = 'hhs_discharge_out'
+            
+    df = df.rename(columns=new_columns)
     
-    # Drop rows that are completely empty or missing the critical Date field
-    df = df.dropna(subset=['Date'])
+    # Ensure the critical 'date' column exists before dropping NaNs
+    if 'date' in df.columns:
+        df = df.dropna(subset=['date'])
+    else:
+        # Fallback if first column is the date but unnamed/named differently
+        df = df.rename(columns={df.columns[0]: 'date'}).dropna(subset=['date'])
     
-    # Map raw columns to standardized, clean script variables
-    column_mapping = {
-        'Date': 'date',
-        'Children apprehended and placed in CBP custody*': 'cbp_intake',
-        'Children in CBP custody': 'cbp_stock',
-        'Children transferred out of CBP custody': 'cbp_transfer_out',
-        'Children in HHS Care': 'hhs_stock',
-        'Children discharged from HHS Care': 'hhs_discharge_out'
-    }
-    df = df.rename(columns=column_mapping)
-    
-    # Clean numeric fields, removing commas and converting text values to numeric safely
+    # Clean numeric fields, removing commas and converting text values to numbers safely
     numeric_cols = [
         'hhs_stock',
         'cbp_intake',
