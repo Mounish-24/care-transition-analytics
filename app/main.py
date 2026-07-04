@@ -1,3 +1,4 @@
+# app/main.py
 import os
 import sys
 import streamlit as st
@@ -87,11 +88,13 @@ def main():
     if not filtered_df.empty:
         latest_record = filtered_df.iloc[-1]
         
-        # Calculate snapshot metrics
-        current_cbp_stock = int(latest_record['cbp_stock'])
-        current_hhs_stock = int(latest_record['hhs_stock'])
-        avg_transfer_ratio = filtered_df['transfer_efficiency_ratio'].mean() * 100
-        avg_discharge_effectiveness = filtered_df['discharge_effectiveness_index'].mean() * 100
+        # Calculate snapshot metrics with explicit NaN handling to prevent ValueError crashes
+        current_cbp_stock = int(latest_record['cbp_stock']) if pd.notna(latest_record['cbp_stock']) else 0
+        current_hhs_stock = int(latest_record['hhs_stock']) if pd.notna(latest_record['hhs_stock']) else 0
+        
+        # Guard ratios from returning errors if calculations evaluate to empty series
+        avg_transfer_ratio = filtered_df['transfer_efficiency_ratio'].mean() * 100 if pd.notna(filtered_df['transfer_efficiency_ratio'].mean()) else 0.0
+        avg_discharge_effectiveness = filtered_df['discharge_effectiveness_index'].mean() * 100 if pd.notna(filtered_df['discharge_effectiveness_index'].mean()) else 0.0
         
         # Render clean metric cards
         kpi_col1.metric(
@@ -129,29 +132,31 @@ def main():
     
     # Extract the trailing 7 records from the selection to view real-time drift
     recent_7_days = filtered_df.tail(7)
-    avg_recent_transfer = recent_7_days['transfer_efficiency_ratio'].mean()
-    avg_recent_backlog = recent_7_days['net_backlog_change'].mean()
     
-    alert_col1, alert_col2 = st.columns(2)
-    
-    with alert_col1:
-        if avg_recent_transfer < CRITICAL_TRANSFER_EFF:
-            st.error(
-                f"⚠️ **CRITICAL TRANSITION DELAY:** CBP-to-HHS transfer efficiency has dropped to "
-                f"**{avg_recent_transfer*100:.1f}%** over the last 7 reporting cycles. "
-                "Immediate logistical transport or processing adjustments are required."
-            )
-        else:
-            st.success("✅ **CBP Transfer Velocity:** Optimal. Clearances matching historical capacity trends.")
-            
-    with alert_col2:
-        if avg_recent_backlog > CRITICAL_BACKLOG_TREND:
-            st.warning(
-                f"⚠️ **SUSTAINED BACKLOG ACCUMULATION:** The pipeline is absorbing an average net surplus of "
-                f"**{avg_recent_backlog:.1f} children/day** recently. HHS intake capacity is falling behind macro inflows."
-            )
-        else:
-            st.success("✅ **Pipeline Equilibrium:** Stable. Outflows are keeping pace with new intakes.")
+    if not recent_7_days.empty:
+        avg_recent_transfer = recent_7_days['transfer_efficiency_ratio'].mean()
+        avg_recent_backlog = recent_7_days['net_backlog_change'].mean()
+        
+        alert_col1, alert_col2 = st.columns(2)
+        
+        with alert_col1:
+            if pd.notna(avg_recent_transfer) and avg_recent_transfer < CRITICAL_TRANSFER_EFF:
+                st.error(
+                    f"⚠️ **CRITICAL TRANSITION DELAY:** CBP-to-HHS transfer efficiency has dropped to "
+                    f"**{avg_recent_transfer*100:.1f}%** over the last 7 reporting cycles. "
+                    "Immediate logistical transport or processing adjustments are required."
+                )
+            else:
+                st.success("✅ **CBP Transfer Velocity:** Optimal. Clearances matching historical capacity trends.")
+                
+        with alert_col2:
+            if pd.notna(avg_recent_backlog) and avg_recent_backlog > CRITICAL_BACKLOG_TREND:
+                st.warning(
+                    f"⚠️ **SUSTAINED BACKLOG ACCUMULATION:** The pipeline is absorbing an average net surplus of "
+                    f"**{avg_recent_backlog:.1f} children/day** recently. HHS intake capacity is falling behind macro inflows."
+                )
+            else:
+                st.success("✅ **Pipeline Equilibrium:** Stable. Outflows are keeping pace with new intakes.")
 
     st.markdown("---")
 
