@@ -15,7 +15,7 @@ def load_clean_uac_data(uploaded_file=None):
     if uploaded_file is not None:
         try:
             df = pd.read_csv(uploaded_file)
-            print("✅ Successfully loaded user-uploaded dataset from Streamlit.")
+            print("Successfully loaded user-uploaded dataset from Streamlit.")
         except Exception as e:
             raise ValueError(f"CRITICAL: Failed to parse uploaded CSV file. Error: {e}")
     else:
@@ -38,10 +38,10 @@ def load_clean_uac_data(uploaded_file=None):
         if not filepath:
             raise FileNotFoundError(
                 f"CRITICAL: Could not find any file matching '{target_substring}' anywhere inside '{project_root}'."
-                "\n👉 Please verify that you have downloaded the file into this project folder!"
+                "\nPlease verify that you have downloaded the file into this project folder."
             )
 
-        print(f"✅ Successfully auto-detected data file at: {filepath}")
+        print(f"Successfully auto-detected data file at: {filepath}")
 
         # Load data
         df = pd.read_csv(filepath)
@@ -59,16 +59,20 @@ def load_clean_uac_data(uploaded_file=None):
         'Children discharged from HHS Care': 'hhs_discharge_out'
     }
     df = df.rename(columns=column_mapping)
+    df.columns = df.columns.str.strip()
     
-    # Clean data types
-    if 'hhs_stock' in df.columns and df['hhs_stock'].dtype == 'object':
-        df['hhs_stock'] = df['hhs_stock'].astype(str).str.replace(',', '', regex=True)
-    
-    df['hhs_stock'] = pd.to_numeric(df['hhs_stock'], errors='coerce')
-    df['cbp_intake'] = pd.to_numeric(df['cbp_intake'], errors='coerce')
-    df['cbp_stock'] = pd.to_numeric(df['cbp_stock'], errors='coerce')
-    df['cbp_transfer_out'] = pd.to_numeric(df['cbp_transfer_out'], errors='coerce')
-    df['hhs_discharge_out'] = pd.to_numeric(df['hhs_discharge_out'], errors='coerce')
+    # Clean numeric fields, removing commas and converting text values to numeric
+    numeric_cols = [
+        'hhs_stock',
+        'cbp_intake',
+        'cbp_stock',
+        'cbp_transfer_out',
+        'hhs_discharge_out'
+    ]
+    for col in numeric_cols:
+        if col in df.columns:
+            df[col] = df[col].astype(str).str.replace(',', '', regex=True)
+            df[col] = pd.to_numeric(df[col], errors='coerce')
     
     # Convert date format and sort chronologically
     df['date'] = pd.to_datetime(df['date'])
