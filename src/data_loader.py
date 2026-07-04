@@ -60,15 +60,17 @@ def load_clean_uac_data(uploaded_file=None):
     }
     df = df.rename(columns=column_mapping)
     
-    # Clean data types
-    if 'hhs_stock' in df.columns and df['hhs_stock'].dtype == 'object':
-        df['hhs_stock'] = df['hhs_stock'].astype(str).str.replace(',', '', regex=True)
+    # --- ULTRA-ROBUST STRING CLEANING LAYER ---
+    # This prevents values from accidentally turning into NaNs due to formatting issues
+    target_numeric_cols = ['cbp_intake', 'cbp_stock', 'cbp_transfer_out', 'hhs_stock', 'hhs_discharge_out']
     
-    df['hhs_stock'] = pd.to_numeric(df['hhs_stock'], errors='coerce')
-    df['cbp_intake'] = pd.to_numeric(df['cbp_intake'], errors='coerce')
-    df['cbp_stock'] = pd.to_numeric(df['cbp_stock'], errors='coerce')
-    df['cbp_transfer_out'] = pd.to_numeric(df['cbp_transfer_out'], errors='coerce')
-    df['hhs_discharge_out'] = pd.to_numeric(df['hhs_discharge_out'], errors='coerce')
+    for col in target_numeric_cols:
+        if col in df.columns:
+            # Force conversion to string, strip whitespace, remove commas, replace empty strings with NaN
+            df[col] = df[col].astype(str).str.strip().str.replace(',', '', regex=True)
+            df[col] = df[col].replace(['nan', 'None', '', ' '], np.nan)
+            # Safely cast clean string numbers to actual float arrays
+            df[col] = pd.to_numeric(df[col], errors='coerce')
     
     # Convert date format and sort chronologically
     df['date'] = pd.to_datetime(df['date'])
