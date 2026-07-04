@@ -46,6 +46,9 @@ def load_clean_uac_data(uploaded_file=None):
         # Load data
         df = pd.read_csv(filepath)
     
+    # --- FIX: Sanitize headers BEFORE renaming to prevent mapping misses on Cloud environments ---
+    df.columns = df.columns.astype(str).str.strip().str.replace(r'\s+', ' ', regex=True)
+    
     # Drop rows that are completely empty or missing the critical Date field
     df = df.dropna(subset=['Date'])
     
@@ -59,9 +62,8 @@ def load_clean_uac_data(uploaded_file=None):
         'Children discharged from HHS Care': 'hhs_discharge_out'
     }
     df = df.rename(columns=column_mapping)
-    df.columns = df.columns.str.strip()
     
-    # Clean numeric fields, removing commas and converting text values to numeric
+    # Clean numeric fields, removing commas and converting text values to numeric safely
     numeric_cols = [
         'hhs_stock',
         'cbp_intake',
@@ -71,7 +73,7 @@ def load_clean_uac_data(uploaded_file=None):
     ]
     for col in numeric_cols:
         if col in df.columns:
-            df[col] = df[col].astype(str).str.replace(',', '', regex=True)
+            df[col] = df[col].astype(str).str.replace(',', '', regex=True).str.strip()
             df[col] = pd.to_numeric(df[col], errors='coerce')
     
     # Convert date format and sort chronologically
