@@ -1,0 +1,71 @@
+# src/data_loader.py
+import pandas as pd
+import numpy as np
+import os
+
+def load_clean_uac_data():
+    """
+    Scans the project directory to locate the UAC dataset dynamically,
+    bypassing static folder path constraints.
+    """
+    # 1. Track current directory tree roots
+    current_file_path = os.path.abspath(__file__)
+    src_folder = os.path.dirname(current_file_path)
+    project_root = os.path.dirname(src_folder)
+    
+    filepath = None
+    target_substring = "HHS_Unaccompanied_Alien_Children_Program"
+    
+    # 2. Walk through all folders to find where the file is hiding
+    for root, dirs, files in os.walk(project_root):
+        for f in files:
+            if target_substring in f:
+                filepath = os.path.join(root, f)
+                break
+        if filepath:
+            break
+            
+    if not filepath:
+        raise FileNotFoundError(
+            f"CRITICAL: Could not find any file matching '{target_substring}' anywhere inside '{project_root}'."
+            "\n👉 Please verify that you have downloaded the file into this project folder!"
+        )
+
+    print(f"✅ Successfully auto-detected data file at: {filepath}")
+
+    # Load data
+    df = pd.read_csv(filepath)
+    
+    # Drop rows that are completely empty or missing the critical Date field
+    df = df.dropna(subset=['Date'])
+    
+    # Map raw columns to standardized, clean script variables
+    column_mapping = {
+        'Date': 'date',
+        'Children apprehended and placed in CBP custody*': 'cbp_intake',
+        'Children in CBP custody': 'cbp_stock',
+        'Children transferred out of CBP custody': 'cbp_transfer_out',
+        'Children in HHS Care': 'hhs_stock',
+        'Children discharged from HHS Care': 'hhs_discharge_out'
+    }
+    df = df.rename(columns=column_mapping)
+    
+    # Clean data types
+    if df['hhs_stock'].dtype == 'object':
+        df['hhs_stock'] = df['hhs_stock'].astype(str).str.replace(',', '', regex=True)
+    
+    df['hhs_stock'] = pd.to_numeric(df['hhs_stock'], errors='coerce')
+    df['cbp_intake'] = pd.to_numeric(df['cbp_intake'], errors='coerce')
+    df['cbp_stock'] = pd.to_numeric(df['cbp_stock'], errors='coerce')
+    df['cbp_transfer_out'] = pd.to_numeric(df['cbp_transfer_out'], errors='coerce')
+    df['hhs_discharge_out'] = pd.to_numeric(df['hhs_discharge_out'], errors='coerce')
+    
+    # Convert date format and sort chronologically
+    df['date'] = pd.to_datetime(df['date'])
+    df = df.sort_values('date').reset_index(drop=True)
+    
+    return df
+
+if __name__ == "__main__":
+    test_df = load_clean_uac_data()
+    print(test_df.head(3))
