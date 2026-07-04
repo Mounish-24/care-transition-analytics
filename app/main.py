@@ -1,4 +1,3 @@
-# app/main.py
 import os
 import sys
 import streamlit as st
@@ -30,9 +29,10 @@ st.set_page_config(
 
 # 4. PERFORMANCE CACHING LAYER
 @st.cache_data
-def get_dashboard_data():
+def get_dashboard_data(uploaded_file=None):
     """Loads, cleans, and computes core operational KPIs for the pipeline."""
-    raw_df = load_clean_uac_data()
+    # Pass the file buffer to data loader (defaults to local file search if None)
+    raw_df = load_clean_uac_data(uploaded_file=uploaded_file)
     processed_df = calculate_pipeline_metrics(raw_df)
     return processed_df
 
@@ -46,17 +46,22 @@ def main():
     )
     st.markdown("---")
     
-    # --- DATA PIPELINE INITIALIZATION ---
-    try:
-        df = get_dashboard_data()
-    except Exception as e:
-        st.error(f"🚨 Critical Failure: Failed to build and load data engine pipeline: {e}")
-        return
-
     # --- SIDEBAR CONTROL CONSOLE ---
     st.sidebar.header("🎛️ Filter Console")
     st.sidebar.markdown("Adjust the global reporting parameters below.")
     
+    # File Uploader component integrated dynamically into the interface
+    uploaded_file = st.sidebar.file_uploader("Upload Custom UAC Dataset (.csv)", type=["csv"])
+    st.sidebar.markdown("---")
+    
+    # --- DATA PIPELINE INITIALIZATION ---
+    try:
+        # Re-fetch cached data if input file changes or remains None
+        df = get_dashboard_data(uploaded_file=uploaded_file)
+    except Exception as e:
+        st.error(f"🚨 Critical Failure: Failed to build and load data engine pipeline: {e}")
+        return
+
     # Extract chronological date ranges
     min_date = df['date'].min().to_pydatetime()
     max_date = df['date'].max().to_pydatetime()
